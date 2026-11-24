@@ -1,0 +1,6 @@
+deps/
+obj/
+libs/
+dist/
+*.so
+*.o
