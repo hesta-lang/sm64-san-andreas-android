@@ -26,7 +26,7 @@ ON_MOD_LOAD()
                     logger->Info("libsm64 initialized successfully. Mario runtime is ready.");
                     break;
                 case SM64BridgeResult::RomNotFound:
-                    logger->Warn("libsm64 is built in, but sm64.us.z64 was not found. Place your legally obtained US ROM in Android/data/com.rockstargames.gtasa/files/.");
+                    logger->Info("libsm64 is built in, but sm64.us.z64 was not found. Place your legally obtained US ROM in Android/data/com.rockstargames.gtasa/files/.");
                     break;
                 case SM64BridgeResult::InvalidRom:
                     logger->Error("SM64 ROM rejected: expected an 8 MiB big-endian US .z64 ROM.");
