@@ -14,27 +14,29 @@ GTA SA v2.00 is the 32-bit target. This project intentionally does not build an 
 
 ## Current status — 0.2.0-alpha
 
-This milestone adds the actual upstream libsm64 source to the Android build and links it into the AML plugin.
+This milestone adds the upstream libsm64 source to the Android build and links it into the AML plugin.
 
 Implemented:
-- Compiles libsm64 source for `armeabi-v7a` instead of relying on a desktop prebuilt library.
+- Compiles libsm64 for `armeabi-v7a` instead of relying on a desktop prebuilt library.
 - Generates the upstream Mario geometry/model source during GitHub Actions.
 - Includes the public `libsm64.h` API in the Android plugin.
 - Adds a guarded runtime initializer for `sm64_global_init`.
-- Searches for a user-supplied US big-endian `.z64` ROM and validates its 8 MiB size and byte-order header.
+- Searches for a user-provided ROM named `sm64.us.z64`.
+- Validates the 8 MiB size, big-endian `.z64` header, and SHA-1 prefix for the US 1.0 ROM before initialization.
+- Creates a Mario simulation instance and executes one libsm64 simulation tick as an ABI/runtime smoke test.
 - Writes initialization diagnostics to Android logcat and the AML logger.
-- Does not terminate GTA SA if the ROM is missing or has the wrong format.
+- Leaves GTA SA running if the ROM is missing or invalid.
 
 Not implemented yet:
-- Mario spawning or CJ replacement.
-- RenderWare rendering of libsm64 geometry.
-- GTA collision surfaces, controls, camera, audio, and animation integration.
+- Mario rendered in-game or CJ replacement.
+- RenderWare conversion of libsm64 geometry.
+- GTA collision surfaces, live controls, camera, audio, and animation integration.
 
-A successful CI build proves the library compiles and is linked. Runtime initialization still needs to be tested on the device with AML and a compatible ROM.
+A successful CI build proves the library compiles and is linked. Runtime initialization still needs to be tested on the device with AML and the correct ROM.
 
 ## ROM placement
 
-The plugin does not include a ROM. Provide your own legally obtained compatible US Super Mario 64 ROM named exactly:
+The plugin does not include a ROM. Provide your own legally obtained **Super Mario 64 US 1.0** ROM named exactly:
 
 `sm64.us.z64`
 
@@ -42,7 +44,7 @@ Preferred location:
 
 `Android/data/com.rockstargames.gtasa/files/sm64.us.z64`
 
-The initializer also checks `/sdcard/AMLMods/GTASA/` and `/sdcard/` as fallback locations. The ROM must be the standard big-endian `.z64` format and exactly 8 MiB.
+The initializer also checks `/sdcard/AMLMods/GTASA/` and `/sdcard/` as fallback locations. The ROM must be the standard big-endian `.z64` format, exactly 8 MiB, and match the US 1.0 SHA-1 check.
 
 ## Build
 
@@ -67,14 +69,14 @@ Artifact name:
 5. Place your ROM in the preferred location listed above.
 6. Start GTA SA and inspect AML logs plus Android logcat for the tag `SM64SanAndreas`.
 
-This build only verifies libsm64 integration and initialization. It does not display Mario in the game yet.
+This build verifies libsm64 linking, initialization, Mario instance creation, and one simulation tick. **It does not display Mario in the game yet.**
 
 ## Porting plan
 
 1. Validate AML loading and the v2.00 ABI.
 2. **Integrate and initialize libsm64 on Android** (current milestone).
 3. Port Mario geometry rendering to RenderWare on Android.
-4. Connect Mario's movement/collision to GTA SA and add mobile controls.
+4. Connect Mario movement and collision to GTA SA and add mobile controls.
 5. Integrate camera, audio, animations, CJ switching, and gameplay interactions.
 
 The original PC plugin uses ASI Loader, plugin-sdk and Direct3D 9. Those parts cannot be copied unchanged to Android.
