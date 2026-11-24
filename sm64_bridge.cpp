@@ -53,12 +53,16 @@ namespace
 
 SM64BridgeResult SM64Bridge::Initialize()
 {
+    __android_log_print(ANDROID_LOG_INFO, kLogTag, "libsm64 initialization requested.");
     if (g_initialized)
         return SM64BridgeResult::AlreadyInitialized;
 
     FILE* romFile = OpenRom();
     if (!romFile)
+    {
+        __android_log_print(ANDROID_LOG_WARN, kLogTag, "SM64 ROM not found in configured paths.");
         return SM64BridgeResult::RomNotFound;
+    }
 
     if (std::fseek(romFile, 0, SEEK_END) != 0)
     {
@@ -70,6 +74,7 @@ SM64BridgeResult SM64Bridge::Initialize()
     if (romLength != static_cast<long>(kExpectedRomSize) ||
         std::fseek(romFile, 0, SEEK_SET) != 0)
     {
+        __android_log_print(ANDROID_LOG_ERROR, kLogTag, "SM64 ROM size/seek validation failed.");
         std::fclose(romFile);
         return SM64BridgeResult::InvalidRom;
     }
@@ -85,7 +90,10 @@ SM64BridgeResult SM64Bridge::Initialize()
     // libsm64 expects the standard big-endian .z64 byte order.
     const uint8_t z64Magic[4] = { 0x80, 0x37, 0x12, 0x40 };
     if (std::memcmp(rom.data(), z64Magic, sizeof(z64Magic)) != 0)
+    {
+        __android_log_print(ANDROID_LOG_ERROR, kLogTag, "SM64 ROM is not big-endian .z64 format.");
         return SM64BridgeResult::InvalidRom;
+    }
 
     g_marioTexture = static_cast<uint8_t*>(std::malloc(kTextureSize));
     if (!g_marioTexture)
