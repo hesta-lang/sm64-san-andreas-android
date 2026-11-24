@@ -1,0 +1,43 @@
+name: Build Android AML plugin
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v4
+
+      - name: Install Android NDK
+        uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: r27c
+
+      - name: Get Android GTA SA plugin SDK support files
+        run: |
+          git clone --depth 1 https://github.com/kudanilll/gtasa-android-plugins-base.git deps/base
+
+      - name: Build GTA SA v2.00 (armeabi-v7a)
+        run: |
+          ndk-build NDK_PROJECT_PATH=. APP_BUILD_SCRIPT=Android.mk NDK_APPLICATION_MK=Application.mk NDK_DEBUG=0
+
+      - name: Stage plugin
+        run: |
+          mkdir -p dist
+          cp libs/armeabi-v7a/libsm64sanandreas.so dist/libsm64sanandreas.so
+          file dist/libsm64sanandreas.so
+
+      - name: Upload plugin
+        uses: actions/upload-artifact@v4
+        with:
+          name: sm64-san-andreas-android-0.1.0-alpha-armeabi-v7a
+          path: dist/libsm64sanandreas.so
+          if-no-files-found: error
