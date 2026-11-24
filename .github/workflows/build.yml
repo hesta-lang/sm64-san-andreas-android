@@ -45,7 +45,10 @@ jobs:
 
       - name: Verify linked libsm64 symbols
         run: |
-          llvm-nm -D libs/armeabi-v7a/libsm64sanandreas.so | grep -E 'sm64_global_init|sm64_mario_create|sm64_mario_tick'
+          NDK_ROOT="$(dirname "$(readlink -f "$(command -v ndk-build)")")"
+          LLVM_NM="$NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-nm"
+          test -x "$LLVM_NM"
+          "$LLVM_NM" -D libs/armeabi-v7a/libsm64sanandreas.so | grep -E 'sm64_global_init|sm64_mario_create|sm64_mario_tick'
           file libs/armeabi-v7a/libsm64sanandreas.so
 
       - name: Stage plugin
