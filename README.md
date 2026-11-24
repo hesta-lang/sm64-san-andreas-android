@@ -26,11 +26,19 @@ GitHub Actions builds the plugin on pushes, pull requests, and manual runs. The 
 
 `libsm64sanandreas.so`
 
-Install it in the AML mods directory for the GTA SA package used by your installation:
+## Install (once the build artifact exists)
 
-`Android/data/<game-package>/mods/`
+1. Open the repository's **Actions** tab: https://github.com/hesta-lang/sm64-san-andreas-android/actions
+2. Open the latest successful **Build Android AML plugin** run.
+3. In **Artifacts**, download `sm64-san-andreas-android-0.1.0-alpha-armeabi-v7a` and extract the ZIP.
+4. Copy `libsm64sanandreas.so` to the game's AML mods folder:
+   `Android/data/com.rockstargames.gtasa/mods/`
+   Create the `mods` folder if it does not exist. If your game installation uses a different package ID, use that package's `Android/data/<package>/mods/` folder instead.
+5. Start GTA SA. Check the AML log for the tag **SM64 San Andreas** and the message **GTA SA v2.00 game-process callback reached**.
 
-Use only the `armeabi-v7a` binary with GTA SA v2.00. Back up game data before testing native mods.
+If Android's file manager blocks access to `Android/data`, use its system document picker or the internal AML directory `/sdcard/AMLMods/<game>/` if your AML build exposes it.
+
+**Important:** this alpha only verifies plugin loading. It does not add Mario to the game yet. Do not install an ARM64 binary; this build is for `armeabi-v7a`. Back up game data before testing native mods.
 
 ## Porting plan
 
