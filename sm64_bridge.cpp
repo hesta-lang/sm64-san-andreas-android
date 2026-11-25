@@ -302,16 +302,18 @@ namespace
         if (!player || !g_initialized)
             return;
 
-        const CVector& position = player->GetPosition();
+        const float gtaX = g_state.position[0] / kGtaToSm64;
+        const float gtaY = -g_state.position[2] / kGtaToSm64;
+        const float gtaZ = g_state.position[1] / kGtaToSm64;
         bool groundFound = false;
         const float groundZ = CWorld::FindGroundZFor3DCoord(
-            position.x, position.y, position.z + 5.0f, &groundFound, nullptr);
+            gtaX, gtaY, gtaZ + 5.0f, &groundFound, nullptr);
         const float safeGroundZ = (groundFound && std::isfinite(groundZ))
-            ? groundZ : position.z - 0.9f;
+            ? groundZ : gtaZ - 0.9f;
 
-        g_groundTransform.position[0] = position.x * kGtaToSm64;
+        g_groundTransform.position[0] = gtaX * kGtaToSm64;
         g_groundTransform.position[1] = safeGroundZ * kGtaToSm64;
-        g_groundTransform.position[2] = -position.y * kGtaToSm64;
+        g_groundTransform.position[2] = -gtaY * kGtaToSm64;
         g_groundTransform.eulerRotation[0] = 0.0f;
         g_groundTransform.eulerRotation[1] = 0.0f;
         g_groundTransform.eulerRotation[2] = 0.0f;
@@ -516,6 +518,8 @@ void SM64Bridge::Update()
     CPad* pad = CPad::GetPad(0);
     if (pad)
     {
+        g_inputs.camLookX = 0.0f;
+        g_inputs.camLookZ = 1.0f;
         g_inputs.stickX = std::max(-1.0f, std::min(1.0f,
             static_cast<float>(pad->NewState.LeftStickX) / 128.0f));
         g_inputs.stickY = std::max(-1.0f, std::min(1.0f,
