@@ -16,6 +16,8 @@
 #include <plugin-sdk/renderware/RpMaterial.h>
 #include <plugin-sdk/renderware/RwFrame.h>
 #include <plugin-sdk/game_sa/entity/PlayerPed.h>
+#include <plugin-sdk/game_sa/engine/Pad.h>
+#include <plugin-sdk/game_sa/engine/World.h>
 #include "TinySHA1.hpp"
 
 namespace
@@ -34,6 +36,12 @@ namespace
     bool g_renderLogged = false;
     uint8_t* g_marioTexture = nullptr;
     int32_t g_marioId = -1;
+    uint32_t g_groundSurfaceId = 0;
+    bool g_groundSurfaceCreated = false;
+    SM64Surface g_groundSurfaces[2]{};
+    SM64ObjectTransform g_groundTransform{};
+    constexpr float kGtaToSm64 = 100.0f;
+    constexpr int32_t kGroundHalfExtent = 100000;
 
     std::vector<float> g_positions;
     std::vector<float> g_normals;
@@ -289,9 +297,82 @@ namespace
         return true;
     }
 
+    void UpdateGroundSurface(CPlayerPed* player)
+    {
+        if (!player || !g_initialized)
+            return;
+
+        const CVector& position = player->GetPosition();
+        bool groundFound = false;
+        const float groundZ = CWorld::FindGroundZFor3DCoord(
+            position.x, position.y, position.z + 5.0f, &groundFound, nullptr);
+        const float safeGroundZ = (groundFound && std::isfinite(groundZ))
+            ? groundZ : position.z - 0.9f;
+
+        g_groundTransform.position[0] = position.x * kGtaToSm64;
+        g_groundTransform.position[1] = safeGroundZ * kGtaToSm64;
+        g_groundTransform.position[2] = -position.y * kGtaToSm64;
+        g_groundTransform.eulerRotation[0] = 0.0f;
+        g_groundTransform.eulerRotation[1] = 0.0f;
+        g_groundTransform.eulerRotation[2] = 0.0f;
+
+        if (!g_groundSurfaceCreated)
+        {
+            // A temporary walkable patch based on GTA's ground-height query.
+            // It deliberately does not claim to represent walls, stairs or slopes.
+            const int32_t h = kGroundHalfExtent;
+            g_groundSurfaces[0].type = 0;
+            g_groundSurfaces[0].force = 0;
+            g_groundSurfaces[0].terrain = 0;
+            g_groundSurfaces[0].vertices[0][0] = -h;
+            g_groundSurfaces[0].vertices[0][1] = 0;
+            g_groundSurfaces[0].vertices[0][2] = -h;
+            g_groundSurfaces[0].vertices[1][0] = h;
+            g_groundSurfaces[0].vertices[1][1] = 0;
+            g_groundSurfaces[0].vertices[1][2] = h;
+            g_groundSurfaces[0].vertices[2][0] = h;
+            g_groundSurfaces[0].vertices[2][1] = 0;
+            g_groundSurfaces[0].vertices[2][2] = -h;
+
+            g_groundSurfaces[1].type = 0;
+            g_groundSurfaces[1].force = 0;
+            g_groundSurfaces[1].terrain = 0;
+            g_groundSurfaces[1].vertices[0][0] = -h;
+            g_groundSurfaces[1].vertices[0][1] = 0;
+            g_groundSurfaces[1].vertices[0][2] = -h;
+            g_groundSurfaces[1].vertices[1][0] = -h;
+            g_groundSurfaces[1].vertices[1][1] = 0;
+            g_groundSurfaces[1].vertices[1][2] = h;
+            g_groundSurfaces[1].vertices[2][0] = h;
+            g_groundSurfaces[1].vertices[2][1] = 0;
+            g_groundSurfaces[1].vertices[2][2] = h;
+
+            SM64SurfaceObject surfaceObject{};
+            surfaceObject.transform = g_groundTransform;
+            surfaceObject.surfaceCount = 2;
+            surfaceObject.surfaces = g_groundSurfaces;
+            g_groundSurfaceId = sm64_surface_object_create(&surfaceObject);
+            g_groundSurfaceCreated = true;
+            __android_log_print(ANDROID_LOG_INFO, kLogTag,
+                                "Created temporary GTA ground collision patch (surface object %u).",
+                                g_groundSurfaceId);
+        }
+        else
+        {
+            sm64_surface_object_move(g_groundSurfaceId, &g_groundTransform);
+        }
+    }
+
     void ReleaseRuntime()
     {
         DestroyRenderObjects();
+
+        if (g_groundSurfaceCreated)
+        {
+            sm64_surface_object_delete(g_groundSurfaceId);
+            g_groundSurfaceId = 0;
+            g_groundSurfaceCreated = false;
+        }
 
         if (g_marioId >= 0)
         {
@@ -389,7 +470,19 @@ SM64BridgeResult SM64Bridge::Initialize()
     g_geometry.uv = g_uvs.data();
     g_geometry.numTrianglesUsed = 0;
 
-    g_marioId = sm64_mario_create(0.0f, 0.0f, 0.0f);
+    CPlayerPed* initialPlayer = FindPlayerPed(0);
+    float initialX = 0.0f;
+    float initialY = 0.0f;
+    float initialZ = 0.0f;
+    if (initialPlayer)
+    {
+        const CVector& initialPosition = initialPlayer->GetPosition();
+        initialX = initialPosition.x * kGtaToSm64;
+        initialY = initialPosition.z * kGtaToSm64;
+        initialZ = -initialPosition.y * kGtaToSm64;
+    }
+
+    g_marioId = sm64_mario_create(initialX, initialY, initialZ);
     if (g_marioId < 0)
     {
         ReleaseRuntime();
@@ -398,6 +491,7 @@ SM64BridgeResult SM64Bridge::Initialize()
 
     sm64_mario_tick(g_marioId, &g_inputs, &g_state, &g_geometry);
     g_initialized = true;
+    UpdateGroundSurface(initialPlayer);
 
     __android_log_print(ANDROID_LOG_INFO, kLogTag,
                         "libsm64 initialized; Mario instance %d completed its first simulation tick with %u triangles.",
@@ -415,9 +509,24 @@ void SM64Bridge::Update()
     if (!g_initialized || g_marioId < 0)
         return;
 
-    // Until GTA collision surfaces and input are connected, keep the visual
-    // libsm64 instance at its local origin instead of letting it fall away.
-    sm64_set_mario_position(g_marioId, 0.0f, 0.0f, 0.0f);
+    CPlayerPed* player = FindPlayerPed(0);
+    if (!player)
+        return;
+
+    CPad* pad = CPad::GetPad(0);
+    if (pad)
+    {
+        g_inputs.stickX = std::max(-1.0f, std::min(1.0f,
+            static_cast<float>(pad->NewState.LeftStickX) / 128.0f));
+        g_inputs.stickY = std::max(-1.0f, std::min(1.0f,
+            -static_cast<float>(pad->NewState.LeftStickY) / 128.0f));
+        g_inputs.buttonA = pad->NewState.ButtonCross > 0 ? 1 : 0;
+        g_inputs.buttonB = pad->NewState.ButtonSquare > 0 ? 1 : 0;
+        g_inputs.buttonZ = pad->NewState.LeftShoulder1 > 0 ? 1 : 0;
+    }
+
+    // libsm64 uses Y-up coordinates; GTA SA uses Z-up coordinates.
+    UpdateGroundSurface(player);
     sm64_mario_tick(g_marioId, &g_inputs, &g_state, &g_geometry);
 }
 
@@ -438,10 +547,9 @@ void SM64Bridge::Render()
 
     RwFrameSetIdentity(g_rwFrame);
     RwMatrix* matrix = RwFrameGetMatrix(g_rwFrame);
-    const CVector& playerPosition = player->GetPosition();
-    matrix->pos.x = playerPosition.x;
-    matrix->pos.y = playerPosition.y;
-    matrix->pos.z = playerPosition.z;
+    matrix->pos.x = g_state.position[0] / kGtaToSm64;
+    matrix->pos.y = -g_state.position[2] / kGtaToSm64;
+    matrix->pos.z = g_state.position[1] / kGtaToSm64;
     RwFrameUpdateObjects(g_rwFrame);
 
     RpAtomicRender(g_rwAtomic);
