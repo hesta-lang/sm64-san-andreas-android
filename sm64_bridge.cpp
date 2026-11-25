@@ -10,6 +10,7 @@
 #include <vector>
 
 #include <libsm64.h>
+#include <plugin-sdk/game_sa/plugin.h>
 #include <plugin-sdk/renderware/RpAtomic.h>
 #include <plugin-sdk/renderware/RpGeometry.h>
 #include <plugin-sdk/renderware/RpMaterial.h>
