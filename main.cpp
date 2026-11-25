@@ -4,32 +4,33 @@
 
 #include "sm64_bridge.h"
 
-MYMOD(hesta.sm64sanandreas.android, SM64 San Andreas Android, 0.2.0-alpha, hesta-lang)
+MYMOD(hesta.sm64sanandreas.android, SM64 San Andreas Android, 0.3.0-alpha, hesta-lang)
 
 ON_MOD_LOAD()
 {
     logger->SetTag("SM64 San Andreas");
-    logger->Info("SM64 San Andreas Android 0.2.0-alpha: AML plugin loaded.");
-    logger->Info("libsm64 Android ARMv7 integration is present.");
+    logger->Info("SM64 San Andreas Android 0.3.0-alpha: AML plugin loaded.");
+
+    static bool initializationAttempted = false;
 
     Events::gameProcessEvent += []()
     {
-        static bool reported = false;
-        if (!reported)
+        if (!initializationAttempted)
         {
-            reported = true;
-            logger->Info("GTA SA v2.00 game-process callback reached.");
+            initializationAttempted = true;
+            logger->Info("GTA SA game-process callback reached; initializing libsm64.");
+
             const SM64BridgeResult result = SM64Bridge::Initialize();
             switch (result)
             {
                 case SM64BridgeResult::Initialized:
-                    logger->Info("libsm64 initialized successfully. Mario runtime is ready.");
+                    logger->Info("libsm64 initialized; Mario geometry is ready for RenderWare.");
                     break;
                 case SM64BridgeResult::RomNotFound:
-                    logger->Info("libsm64 is built in, but sm64.us.z64 was not found. Place your legally obtained US ROM in Android/data/com.rockstargames.gtasa/files/.");
+                    logger->Info("SM64 ROM not found. Place sm64.us.z64 in Android/data/com.rockstargames.gtasa/files/.");
                     break;
                 case SM64BridgeResult::InvalidRom:
-                    logger->Error("SM64 ROM rejected: expected an 8 MiB big-endian US .z64 ROM.");
+                    logger->Error("SM64 ROM rejected: expected the 8 MiB big-endian US 1.0 ROM.");
                     break;
                 case SM64BridgeResult::AlreadyInitialized:
                     logger->Info("libsm64 was already initialized.");
@@ -38,6 +39,19 @@ ON_MOD_LOAD()
                     logger->Error("libsm64 initialization failed.");
                     break;
             }
+            return;
         }
+
+        SM64Bridge::Update();
+    };
+
+    Events::renderEffectsEvent += []()
+    {
+        SM64Bridge::Render();
+    };
+
+    Events::shutdownRwEvent += []()
+    {
+        SM64Bridge::ShutdownRenderWare();
     };
 }

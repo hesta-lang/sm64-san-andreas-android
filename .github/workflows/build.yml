@@ -21,25 +21,33 @@ jobs:
         with:
           ndk-version: r27c
 
-      - name: Install libsm64 source
+      - name: Install pinned libsm64 source
         run: |
-          git clone --depth 1 https://github.com/libsm64/libsm64.git deps/libsm64
+          git clone --no-checkout https://github.com/libsm64/libsm64.git deps/libsm64
+          git -C deps/libsm64 fetch --depth 1 origin fd11813208272b4271d92bd92feb8f3fdbe61be5
+          git -C deps/libsm64 checkout --detach FETCH_HEAD
           python3 --version
           cd deps/libsm64
           python3 import-mario-geo.py
 
-      - name: Get Android GTA SA plugin SDK support files
+      - name: Get pinned Android GTA SA plugin SDK support files
         run: |
-          git clone --depth 1 https://github.com/kudanilll/gtasa-android-plugins-base.git deps/base
+          git clone --no-checkout https://github.com/kudanilll/gtasa-android-plugins-base.git deps/base
+          git -C deps/base fetch --depth 1 origin 9b0f47714f3206cbbb2ef5870f276c0fb21155f4
+          git -C deps/base checkout --detach FETCH_HEAD
 
-      - name: Verify libsm64 generated sources
+      - name: Verify source headers and generated Mario geometry
         run: |
           test -s deps/libsm64/src/libsm64.h
           test -s deps/libsm64/src/decomp/mario/geo.inc.c
           test -s deps/libsm64/src/decomp/mario/model.inc.c
-          echo "libsm64 source and generated Mario geometry are present."
+          test -s deps/base/plugin-sdk/renderware/RpAtomic.h
+          test -s deps/base/plugin-sdk/renderware/RpGeometry.h
+          test -s deps/base/plugin-sdk/game_sa/Events.h
+          grep -q 'renderEffectsEvent' deps/base/plugin-sdk/game_sa/Events.h
+          echo "Pinned libsm64 and Android RenderWare SDK sources are present."
 
-      - name: Build GTA SA v2.00 with libsm64 (armeabi-v7a)
+      - name: Build GTA SA v2.00 with libsm64 and RenderWare renderer (armeabi-v7a)
         run: |
           ndk-build NDK_PROJECT_PATH=. APP_BUILD_SCRIPT=Android.mk NDK_APPLICATION_MK=Application.mk NDK_DEBUG=0 V=1
 
@@ -48,7 +56,7 @@ jobs:
           NDK_ROOT="$(dirname "$(readlink -f "$(command -v ndk-build)")")"
           LLVM_NM="$NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-nm"
           test -x "$LLVM_NM"
-          "$LLVM_NM" -D libs/armeabi-v7a/libsm64sanandreas.so | grep -E 'sm64_global_init|sm64_mario_create|sm64_mario_tick'
+          "$LLVM_NM" -D libs/armeabi-v7a/libsm64sanandreas.so | grep -E 'sm64_global_init|sm64_mario_create|sm64_mario_tick|sm64_set_mario_position'
           file libs/armeabi-v7a/libsm64sanandreas.so
 
       - name: Stage plugin
@@ -59,6 +67,6 @@ jobs:
       - name: Upload plugin
         uses: actions/upload-artifact@v4
         with:
-          name: sm64-san-andreas-android-0.2.0-alpha-armeabi-v7a
+          name: sm64-san-andreas-android-0.3.0-alpha-renderware-armeabi-v7a
           path: dist/libsm64sanandreas.so
           if-no-files-found: error
